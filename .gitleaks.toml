@@ -1,0 +1,44 @@
+# gitleaks configuration.
+#
+# The default rule set is used in full; this file records allowlist entries,
+# each with a justification. An allowlist entry without a reason is a suppressed
+# finding, which is indistinguishable from an unnoticed one.
+#
+# This repository handles no credentials of its own. It reads telemetry files
+# and writes reports; there is no provider client and no authentication. The
+# only credential-shaped strings in the tree are fixtures for the redaction
+# pass, and every one of them is constructed by concatenation so that a reader
+# can see at a glance that it was never valid.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Repository-wide allowlist"
+
+paths = [
+  # Redaction fixtures. Every credential-shaped string here is built by
+  # concatenation in tests/conftest.py — "AKIA" + "IOSFODNN7EXAMPLE" — so
+  # nothing was ever a valid credential.
+  '''tests/conftest\.py''',
+  '''tests/security/.*\.py''',
+]
+
+regexes = [
+  # Documented placeholders in .env.example and the configuration reference.
+  '''REPLACE_ME[A-Z_]*''',
+  # AWS's own documented example key, used as a redaction fixture. It has never
+  # been valid and appears in AWS's public documentation.
+  '''AKIAIOSFODNN7EXAMPLE''',
+  # A run of a single repeated character is a fixture, not a credential: the
+  # redaction tests need tokens of the right shape and length, and nothing else.
+  '''gh[pousr]_a{20,}''',
+  '''sk-b{20,}''',
+  '''sk-ant-c{20,}''',
+  '''AIza[d]{20,}''',
+  '''xox[abposr]-e{10,}''',
+  # The placeholder the redactor substitutes, which appears in expected values
+  # throughout the tests. Fixed-length on purpose: a placeholder that echoed the
+  # length of what it replaced would leak it.
+  '''\[redacted\]''',
+]

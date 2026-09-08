@@ -1,0 +1,55 @@
+name: Container
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: Build, scan and smoke-test the image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: llmops-observability:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: llmops-observability:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: The image does not run as root
+        run: |
+          user="$(docker run --rm --entrypoint id llmops-observability:ci -u)"
+          [ "$user" != "0" ] || { echo "the image runs as root"; exit 1; }
+
+      - name: Smoke test
+        # Runs the project's own gate *inside* the built image, asserts it can
+        # still fail there with exit 2 and 3 distinctly, and that the committed
+        # corpus and the shipped generator agree in the artefact. Everything
+        # else in this pipeline tests the source tree; this is the only thing
+        # that tests what actually ships.
+        run: bash scripts/smoke-test.sh llmops-observability:ci

@@ -1,0 +1,103 @@
+# The objectives the shipped example gates on.
+#
+# Three kinds, deliberately: each of the four example windows breaks exactly one
+# of them, which is the argument that they are measuring different things rather
+# than three views of the same signal.
+
+name: example-platform
+
+objectives:
+  # The outage scenario breaks this one. The slowdown and cost-spike scenarios
+  # do not touch it, which is the point: an availability objective is blind to
+  # a platform that is up, correct, slow and expensive.
+  - name: chat-availability
+    kind: availability
+    description: >
+      Chat calls answer. A safety refusal counts as an answer: the platform
+      responded, and an objective that treats refusals as outages rewards a team
+      for weakening its safety filter.
+    target: 0.999
+    period: 30d
+    select:
+      operation: chat
+
+  # The slowdown scenario breaks this one. Phrased as "99% of calls under 3s"
+  # rather than "p99 under 3s", because the first has an error budget — the 1%
+  # that were not — and the second needs a percentile estimator over a sliding
+  # window, which is a much worse thing to build a gate on.
+  - name: chat-latency
+    kind: latency
+    description: 99% of chat calls answer within five seconds.
+    target: 0.99
+    threshold_ms: 5000
+    period: 30d
+    select:
+      operation: chat
+
+  # The cost-spike scenario breaks this one, and nothing else does. A prompt
+  # change that triples output length produces no errors and no latency signal;
+  # this is the only objective that sees it.
+  - name: monthly-spend
+    kind: spend
+    description: The platform costs no more than $80 a month.
+    budget_usd: 80
+    period: 30d
+    # Lower thresholds and longer windows than the availability table, both
+    # deliberately.
+    #
+    # Lower, because that table is calibrated for outages: a budget burning at
+    # 14.4x means spending a month's money in two days, and by the time that
+    # fires the invoice is already written. Sustained overspend at 2x is worth
+    # a page.
+    #
+    # Longer, because traffic is diurnal and a budget is flat. At 04:00 the
+    # platform is at a third of its peak, so spend against a flat pro-rata
+    # share reads low no matter what is wrong — a half-hour spend window would
+    # drop out of alert every night and back in every morning. Six hours is the
+    # shortest window that survives the daily cycle here. See docs/burnrate.md.
+    rules:
+      - name: fast-burn
+        severity: page
+        long_window: 1d
+        short_window: 6h
+        burn_rate: 2
+      - name: creeping-burn
+        severity: ticket
+        long_window: 3d
+        short_window: 12h
+        burn_rate: 1.3
+
+  # Embeddings are a different service with a different shape: enormous volume,
+  # tiny calls, and a much tighter latency expectation. Selecting them out of
+  # the chat objectives above and giving them their own is the reason selectors
+  # exist.
+  - name: embedding-latency
+    kind: latency
+    description: 99.5% of embedding calls answer within 250ms.
+    target: 0.995
+    threshold_ms: 250
+    period: 30d
+    select:
+      operation: embedding
+    # Its own rules, and this is the instructive part. Embeddings run at about
+    # twenty calls an hour here, so a one-hour window never reaches the
+    # thirty-call minimum and the standard table's fast rule would report "not
+    # evaluated" forever. A low-volume service needs longer windows: it cannot
+    # be watched as closely, and pretending otherwise produces a rule that is
+    # either silent or firing on three calls.
+    rules:
+      - name: fast-burn
+        severity: page
+        long_window: 6h
+        short_window: 30m
+        burn_rate: 14.4
+      - name: slow-burn
+        severity: ticket
+        long_window: 1d
+        short_window: 2h
+        burn_rate: 3
+      - name: creeping-burn
+        severity: ticket
+        long_window: 3d
+        short_window: 6h
+        burn_rate: 1

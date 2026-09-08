@@ -1,0 +1,58 @@
+# Rates in USD per million tokens, as vendors publish them.
+#
+# **These are illustrative figures for a worked example, not a price list.**
+# They are in the right order of magnitude for the models named, and they were
+# not copied from any vendor's page today. Check the real ones before costing
+# anything you care about — and note that this is exactly why a price book is
+# dated and content-addressed: a report carries the digest of the rates that
+# produced it, so a number can always be traced back to what it was computed
+# from.
+
+name: example-rates
+
+prices:
+  - provider: openai
+    model: gpt-4o-mini
+    input_per_million: 0.15
+    output_per_million: 0.60
+    # A separate rate rather than a discount factor, because that is the number
+    # on the vendor's page and therefore the number a person will check.
+    cached_input_per_million: 0.075
+    valid_from: 2026-01-01
+    note: illustrative
+
+  - provider: openai
+    model: gpt-4o
+    input_per_million: 2.50
+    output_per_million: 10.00
+    cached_input_per_million: 1.25
+    valid_from: 2026-01-01
+    note: illustrative
+
+  - provider: anthropic
+    model: claude-haiku
+    input_per_million: 0.80
+    output_per_million: 4.00
+    valid_from: 2026-01-01
+    note: illustrative
+
+  # Operation-scoped, and it matters: an embedding costs a fiftieth of a chat
+  # turn, and falling back to a chat rate for it would make the whole spend
+  # report indefensible. An operation-specific entry wins over a general one.
+  - provider: openai
+    model: text-embedding-3-small
+    operation: embedding
+    input_per_million: 0.02
+    output_per_million: 0.0
+    valid_from: 2026-01-01
+    note: illustrative
+
+  # A historical rate, kept to show what `valid_from` is for. A window from
+  # before the cut is costed at the old price; costing last quarter with this
+  # quarter's rates produces a number that is not a fact about last quarter.
+  - provider: openai
+    model: gpt-4o
+    input_per_million: 5.00
+    output_per_million: 15.00
+    valid_from: 1970-01-01
+    note: the rate before the 2026-01-01 reduction
