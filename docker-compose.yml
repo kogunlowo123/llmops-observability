@@ -1,0 +1,102 @@
+# Gating your own telemetry without installing anything.
+#
+# This is a command-line tool, so there is no long-running service here. Each
+# entry below is a one-shot container that reads a window and an objectives file
+# from ./telemetry, writes reports to ./reports, and exits with the code the
+# gate decided — 0 held, 2 an objective was missed, 3 the tool could not run.
+#
+#   docker compose run --rm gate
+#   docker compose run --rm cost
+#   docker compose run --rm doctor
+#   docker compose run --rm synth
+#
+# `docker compose up` would start them all and immediately report them as
+# exited, which is why every service sets `profiles`: nothing starts unless it
+# is named.
+#
+# ./reports must be writable by uid 10001 — the image does not run as root. On
+# Linux a bind mount carries the host's ownership straight through, so
+# `chmod 0777 reports` once, or create it with `mkdir -p reports` before the
+# first run.
+
+services:
+  gate:
+    profiles: [tools]
+    build:
+      context: .
+      args:
+        PYTHON_VERSION: "3.12"
+    image: llmops-observability:local
+    # A gate reads files and decides. The only exporter that could open a socket
+    # cannot be constructed without --allow-network, so nothing here needs
+    # egress. `network_mode: none` makes that visible in the compose file too,
+    # and turns a future mistake into a connection error rather than telemetry
+    # arriving somewhere nobody chose.
+    network_mode: none
+    volumes:
+      - ./telemetry:/app/telemetry:ro
+      - ./reports:/app/reports
+    environment:
+      LLMOPS_LOG__FORMAT: json
+      LLMOPS_LOG__LEVEL: INFO
+    command:
+      - gate
+      - --window=telemetry/window.jsonl.gz
+      - --objectives=telemetry/objectives.yaml
+      - --pricebook=telemetry/prices.yaml
+      - --json-out=reports/slo.json
+      - --junit-out=reports/slo.xml
+      - --markdown-out=reports/slo.md
+
+  cost:
+    profiles: [tools]
+    image: llmops-observability:local
+    network_mode: none
+    volumes:
+      - ./telemetry:/app/telemetry:ro
+    command:
+      - cost
+      - --window=telemetry/window.jsonl.gz
+      - --pricebook=telemetry/prices.yaml
+      - --by=model
+
+  # What this installation would do, with no files at all. Useful as the first
+  # thing to run after a build.
+  doctor:
+    profiles: [tools]
+    image: llmops-observability:local
+    network_mode: none
+    command: [doctor]
+
+  # Generate a window to gate against. The corpus is deterministic, so the same
+  # scenario and seed produce the same spans on every machine.
+  synth:
+    profiles: [tools]
+    image: llmops-observability:local
+    network_mode: none
+    volumes:
+      - ./telemetry:/app/telemetry
+    command:
+      - synth
+      - --scenario=outage
+      - --out=telemetry/window.jsonl.gz
+
+  # Exporting to a collector is the one operation that needs egress, and it is
+  # deliberately a separate service under its own profile so that turning the
+  # network on is a visible act rather than a default nobody noticed. The
+  # exporter cannot even be constructed without --allow-network.
+  export:
+    profiles: [export]
+    image: llmops-observability:local
+    volumes:
+      - ./telemetry:/app/telemetry:ro
+    environment:
+      LLMOPS_EXPORT__OTLP_ENDPOINT: ${LLMOPS_EXPORT__OTLP_ENDPOINT:?set an OTLP endpoint before exporting}
+    command:
+      - synth
+      - --scenario=steady
+      # --out is required by the command line and unused on this path: with
+      # --export=otlp the window goes to the collector, not to a file.
+      - --out=/tmp/exported.jsonl
+      - --export=otlp
+      - --allow-network
