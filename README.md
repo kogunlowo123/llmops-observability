@@ -1,5 +1,9 @@
 # llmops-observability
 
+![Banner](docs/banner.png)
+
+> If this project is useful, a star helps other engineers find it.
+
 **LLM telemetry you can gate on.** Cost accounting against a versioned price
 book, multi-window burn-rate error budgets, and a command that exits non-zero
 when an objective is missed.
