@@ -223,3 +223,60 @@ Four runtime dependencies. The OTLP exporter speaks HTTP/JSON over stdlib
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+<!-- project-structure -->
+## Project structure
+
+```text
+├── .github/
+├── docs/
+│   ├── burnrate.md
+│   ├── cardinality.md
+│   ├── ci.md
+│   ├── cost.md
+│   ├── objectives.md
+│   └── windows.md
+├── examples/
+│   ├── windows/
+│   ├── README.md
+│   ├── burnrate_demo.py
+│   ├── cardinality_demo.py
+│   ├── objectives.yaml
+│   ├── prices.yaml
+│   └── quickstart.py
+├── scripts/
+│   ├── build_site.py
+│   ├── check-incidents.py
+│   └── smoke-test.sh
+├── security/
+│   ├── audit-exceptions.md
+│   └── audit-ignores.txt
+├── src/
+│   └── llmops/
+├── tests/
+│   ├── e2e/
+│   ├── integration/
+│   ├── meta/
+│   ├── security/
+│   ├── unit/
+│   ├── __init__.py
+│   └── conftest.py
+├── .env.example
+├── .gitattributes
+├── .gitignore
+├── .gitleaks.toml
+├── ARCHITECTURE.md
+├── CHANGELOG.md
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
+├── Dockerfile
+├── LICENSE
+├── Makefile
+├── README.md
+… (truncated)
+```
+
+<!-- architecture -->
+## Architecture
+
+![Architecture diagram](docs/architecture.svg)
